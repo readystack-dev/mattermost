@@ -1,0 +1,102 @@
+{
+  "schema": "kitforge.build_recipe.v1",
+  "slug": "mattermost",
+  "image": "readystack/mattermost:v12.0.2-CE-ubuntu24.04-r4",
+  "build_method": "source-rebuild-go",
+  "source": {
+    "repo": "https://github.com/mattermost/mattermost",
+    "ref": "v12.0.2",
+    "builder_image": "golang:1.26.11-bookworm",
+    "go_module_root": "github.com/mattermost/mattermost/server/v8",
+    "go_version_required": "1.26.10",
+    "multi_module": true,
+    "git_sha": "1f5e0e9",
+    "_multi_module_note": "TRUE, and the module_dir on both binaries is ./server \u2014 the Go module lives in the server/ subtree of a monorepo, not at the repo root. That makes render_l009_kit vendor and build from inside ./server, which is what we need.",
+    "ee_strip": [
+      "server/enterprise",
+      "LICENSE.enterprise"
+    ],
+    "_ee_strip_licence": "Mattermost Source Available License (server/enterprise/LICENSE; LICENSE.enterprise is a symlink to it)",
+    "ee_stubs": {
+      "server/enterprise": [
+        "placeholder.go"
+      ]
+    },
+    "_ee_stubs_note": "server/enterprise keeps ONLY the empty ReadyStack placeholder.go that source_patches writes (cmd/mattermost blank-imports package enterprise). The vendored-tree strip and the sale-tar leak check (drive.py _ee_strip_sh / _ee_leak_check_sh) remove and refuse everything else under it.",
+    "_ee_strip_note": "Removes the Source Available tree from the ACQUIRED source before the CE audit and the tree hash, so the packaged source is genuinely CE-only. LICENSE.enterprise at the repo root is a SYMLINK whose content is the literal string 'server/enterprise/LICENSE'; ee_strip refuses to follow symlinks and deletes the link itself, which is the correct outcome. Note ee_strip acts on the acquire-stage tree only \u2014 the vendor stage clones fresh, so the BUILD is cleaned by source_patches below instead. Both are needed: one makes the archive CE, the other makes the binary CE.",
+    "build_env": {
+      "CGO_ENABLED": "0",
+      "GOOS": "linux",
+      "GOARCH": "amd64",
+      "GOTOOLCHAIN": "local",
+      "GOFLAGS": "-buildvcs=false",
+      "GOWORK": "off",
+      "BUILD_NUMBER": "@VERSION@"
+    },
+    "_build_env_note": "BUILD_NUMBER IS A SECURITY-RELEVANT SETTING HERE, not cosmetic. server/Makefile defaults it to `dev` when empty, and then appends `sourceavailable` to BUILD_TAGS \u2014 which links the MSL metrics and elasticsearch code straight into the binary. An unset BUILD_NUMBER silently produces a non-CE build that looks fine. Pin it to the release tag. GOFLAGS=-buildvcs=false and -trimpath keep the build free of VCS stamps; upstream's own release.mk passes -buildvcs=false for the same reason.",
+    "vendor_build": {
+      "tooling": [
+        "nodejs",
+        "make"
+      ],
+      "node_version": "24",
+      "cmds": [
+        "(cd webapp && npm ci --include=dev)",
+        "(cd webapp && NODE_OPTIONS=--max-old-space-size=6144 npm run build)",
+        "test -d webapp/channels/dist && echo 'webapp build present'",
+        "rm -rf webapp/node_modules webapp/*/node_modules webapp/platform/*/node_modules"
+      ],
+      "_note": "FILESYSTEM-asset materialization, NOT a go:embed \u2014 the server serves the web client from a client/ directory next to the binary at runtime, so this output is carried into the runtime image by offline_stage_copies below rather than compiled in. npm (not pnpm/yarn): webapp/package-lock.json is the only committed lockfile and package.json declares engines node ^24 / npm ^11 with no packageManager field. `npm run build` is `node scripts/build.mjs`, which is exactly what upstream's `make dist` invokes. --include=dev is required because the build toolchain itself lives in devDependencies. The postinstall runs patch-package against the committed patches in webapp/patches/ (five at v12.0.0), which is offline-safe. LAST CMD MATTERS: the renderer's own cleanup is `rm -rf node_modules` at the repo ROOT only, so mattermost's webapp/node_modules \u2014 an npm-workspaces tree with a copy under each of seven workspaces \u2014 would ride into the exported vendored source. That is the L-A56 shape that deadlocked buildkit's local export on grafana's ~48k-file tree, and nothing downstream needs it: the offline stage builds from server/vendor and copies webapp/channels/dist, neither of which lives under node_modules. SUBSHELLS, not bare `cd`: the renderer joins these cmds with && into ONE RUN, so the working directory PERSISTS from one to the next. A second bare `cd webapp` would resolve against /src/webapp and fail on a directory that does not exist, and the paths in the two cmds after it would be wrong in the same way. Wrapping each cd in a subshell keeps every command anchored at /src.",
+      "node_dist": {
+        "version": "24.22.3",
+        "sha256": "061ec3e3062115705b56b51fa9cc330ab50d34b6969387d4e4b1a50c6809acc2"
+      }
+    },
+    "source_date_epoch": 1795543317,
+    "source_date_epoch_provenance": "the time release v12.0.2-CE-ubuntu24.04-r4 was cut (2026-11-24T18:01:57Z), by scripts/rerelease-agenda.py: ReadyStack dates an image by when its release was packaged (owner 2026-11-10), recorded here once and used by every rebuild of the release; it builds upstream commit 13ae6c4cf1a8, dated 2026-11-04T06:08:14Z (source.commit_epoch).",
+    "_version_note": "v12.0.0 is the LATEST GA (queue-latest-version policy; checked 2026-10-20): published 2026-10-14, prerelease=false. v11.11.2 (2026-10-19) is a patch on the older 11.11 line and v12.1.0-rc1 is a release candidate. Do not confuse the per-package tags in this monorepo with the application release.",
+    "commit": "13ae6c4cf1a8e73c35a4f0c8816a505506c7acdd",
+    "source_date_epoch_basis": "release-cut",
+    "commit_epoch": 1793772494
+  },
+  "binaries_from_source": [
+    {
+      "name": "mattermost",
+      "module": "github.com/mattermost/mattermost/server/v8",
+      "module_dir": "./server",
+      "main_pkg": "./cmd/mattermost",
+      "cgo_enabled": 0,
+      "build_tags": [
+        "production"
+      ],
+      "ldflags": "-s -w",
+      "verify_subcmd": "version",
+      "why": "The server. -tags production is REQUIRED, not optional: public/model/service_environment_production_default.go is behind that tag, and without it the binary defaults to a dev service environment pointing at different telemetry and licensing endpoints. Upstream always passes it.",
+      "out_path": "/mattermost/bin/mattermost"
+    },
+    {
+      "name": "mmctl",
+      "module": "github.com/mattermost/mattermost/server/v8",
+      "module_dir": "./server",
+      "main_pkg": "./cmd/mmctl",
+      "cgo_enabled": 0,
+      "build_tags": [
+        "production"
+      ],
+      "ldflags": "-s -w",
+      "verify_subcmd": "version",
+      "why": "The admin CLI, and the only supported way to administer this server without a browser \u2014 it is what the admin handbook documents. Builds clean once compliance_export.go is removed (see source_patches).",
+      "out_path": "/mattermost/bin/mmctl"
+    }
+  ],
+  "runtime_packages": [
+    "ca-certificates",
+    "tzdata",
+    "curl",
+    "poppler-utils",
+    "wv",
+    "unrtf",
+    "tidy",
+    "mailcap"
+  ]
+}

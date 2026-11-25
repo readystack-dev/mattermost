@@ -1,0 +1,8 @@
+image_manifest_digest=sha256:d4fa022f446a94eb07bc6586fdc60703f0c9cb0fea320d83e7d9c7d0a6349c6d
+config_digest=sha256:560c335a067bc2c0ebd3282c7f9b2a1eb88359425f304614ec3cc824e67baaf3
+tag=readystack/mattermost:v12.0.2-CE-ubuntu24.04-r4
+probe_port=8065
+probe_path=/api/v4/system/ping
+probe_timeout=180
+verify_boot=skip
+verify_boot_reason=this image needs pg (not part of this archive); boot it with your own services as the admin handbook describes

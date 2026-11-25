@@ -1,0 +1,8 @@
+ca-certificates
+tzdata
+curl
+poppler-utils
+wv
+unrtf
+tidy
+mailcap

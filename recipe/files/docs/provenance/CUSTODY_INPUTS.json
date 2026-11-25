@@ -1,0 +1,20 @@
+{
+  "schema": "kitforge.custody_inputs.v1",
+  "slug": "mattermost",
+  "repo": "https://github.com/mattermost/mattermost",
+  "ref": "v12.0.2",
+  "commit": "13ae6c4cf1a8e73c35a4f0c8816a505506c7acdd",
+  "edition": "CE",
+  "ce_audit": {
+    "ce_only": true,
+    "ee_dirs_found": [],
+    "ee_stripped": [
+      "server/enterprise",
+      "LICENSE.enterprise"
+    ],
+    "allowlisted_benign_paths": [],
+    "method": "top-3-level dir scan, .git excluded, precise EE name match, strategy allowlist applied",
+    "note": "EE forks are separate products \u2014 never packaged. CE-only is pillar #1. allowlisted_benign_paths are OSS-repo artifacts named 'enterprise', NOT EE code.",
+    "rechecked_at": "package_archive"
+  }
+}
